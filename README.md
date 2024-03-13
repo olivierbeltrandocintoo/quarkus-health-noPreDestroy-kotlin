@@ -1,22 +1,31 @@
-# Example of Health not releasing resources
+# In Kotlin the preDestroy bound to the request scope is not called at the end of a probe
+
+## How to reproduce
+
+- start the app `./mvnw clean quarkus:dev`
+- call the <http://localhost:8080/q/health> a few times and see the release not being invoked -> both in the webpage and in the logs
+
+This is like this since... at least quarkus 3.6 (I think that's where I started using probes). And it still like this after quarkus 3.7.
+
+## Example of Health not releasing resources
 
 The sources contain 3 files
 
 - `Endpoint.kt` which exposes:
-  - expose <http://localhost:8080/> that accesses a "DbSource" then release it manully
+  - expose <http://localhost:8080/> that accesses a "DbSource" then release it manually
   - expose <http://localhost:8080/auto> that accesses a "DbSource" then release it automatically thanks to the `@PreDestroy`
 
 - `DbSource.kt` that emulates a pool of 4 tokens (like a DbPool)
-  - `aquire` tries to acquire a token and immediately returns upon success
+  - `acquire` tries to acquire a token and immediately returns upon success
   - when the pool is exhausted `acquire` will block up to 3s then throw
   - `release` returns a token to the pool
   - `DbSource.kt` is marked as `@RequestScoped` and has a `@PreDestroy` method that does the `release` when the request is finished
 
-- `ReadinessAndLiveness.kt` that implements HealCheck that tries to aquires a token
+- `ReadinessAndLiveness.kt` that implements HealCheck that tries to acquires a token
 
-## The issue
+### The issue
 
-The calling HealthCheck <http://localhost:8080/q/health/> altough marked as RequestScoped does not call the `@PreDestroy` after the first call.
+The calling HealthCheck <http://localhost:8080/q/health/> although marked as RequestScoped does not call the `@PreDestroy` after the first call.
 
 Example of logs when calling 5 times the HealthCheck:
 
@@ -43,7 +52,7 @@ __  ____  __  _____   ___  __ ____  ______
 2024-02-20 11:19:57,127 INFO  [io.sma.health] (vert.x-worker-thread-1) SRHCK01001: Reporting health down status: {"status":"DOWN","checks":[{"name":"DbConnection","status":"DOWN","data":{"Exception":"Could not acquire on time"}}]}
 ```
 
-## For other endpoints it works well
+### For other endpoints it works well
 
 Calling <http://localhost:8080/> or <http://localhost:8080/auto> works and releases the connection each time
 

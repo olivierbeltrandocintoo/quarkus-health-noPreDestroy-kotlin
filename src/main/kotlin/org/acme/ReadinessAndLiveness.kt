@@ -6,9 +6,11 @@ import org.eclipse.microprofile.health.HealthCheck
 import org.eclipse.microprofile.health.HealthCheckResponse
 import org.eclipse.microprofile.health.HealthCheckResponseBuilder
 import org.eclipse.microprofile.health.Liveness
+//import org.eclipse.microprofile.health.Readiness
 
 
 @Liveness
+//@Readiness
 @RequestScoped
 internal class ReadinessAndLiveness : HealthCheck {
     @Inject
@@ -21,6 +23,9 @@ internal class ReadinessAndLiveness : HealthCheck {
             return builder.up().build()
         } catch (e: Exception) {
             return builder.withData("Exception", e.message).down().build()
+        } finally {
+            // manual release because preDestroy is not called
+            // dbSource!!.release()
         }
     }
 }
