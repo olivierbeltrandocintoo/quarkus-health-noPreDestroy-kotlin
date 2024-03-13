@@ -1,60 +1,106 @@
-# rest-kotlin-quickstart
+# Example of Health not releasing resources
 
-This project uses Quarkus, the Supersonic Subatomic Java Framework.
+The sources contain 3 files
 
-If you want to learn more about Quarkus, please visit its website: https://quarkus.io/ .
+- `Endpoint.java` which exposes:
+  - expose <http://localhost:8080/> that accesses a "DbSource" then release it manully
+  - expose <http://localhost:8080/auto> that accesses a "DbSource" then release it automatically thanks to the `@PreDestroy`
 
-## Running the application in dev mode
+- `DbSource.java` that emulates a pool of 4 tokens (like a DbPool)
+  - `aquire` tries to acquire a token and immediately returns upon success
+  - when the pool is exhausted `acquire` will block up to 3s then throw
+  - `release` returns a token to the pool
+  - `DbSource.java` is marked as `@RequestScoped` and has a `@PreDestroy` method that does the `release` when the request is finished
 
-You can run your application in dev mode that enables live coding using:
-```shell script
-./mvnw compile quarkus:dev
+- `ReadinessAndLiveness.java` that implements HealCheck that tries to aquires a token
+
+## The issue
+
+The calling HealthCheck <http://localhost:8080/q/health/> altough marked as RequestScoped does not call the `@PreDestroy` after the first call.
+
+Example of logs when calling 5 times the HealthCheck:
+
+```sh
+mvn quarkus:dev
+...
+__  ____  __  _____   ___  __ ____  ______ 
+ --/ __ \/ / / / _ | / _ \/ //_/ / / / __/ 
+ -/ /_/ / /_/ / __ |/ , _/ ,< / /_/ /\ \   
+--\___\_\____/_/ |_/_/|_/_/|_|\____/___/   
+2024-02-20 11:19:44,222 INFO  [io.quarkus] (Quarkus Main Thread) microprofile-health-quickstart 1.0.0-SNAPSHOT on JVM (powered by Quarkus 3.6.7) started in 1.572s. Listening on: http://0.0.0.0:8080
+
+2024-02-20 11:19:44,225 INFO  [io.quarkus] (Quarkus Main Thread) Profile dev activated. Live Coding activated.
+2024-02-20 11:19:44,226 INFO  [io.quarkus] (Quarkus Main Thread) Installed features: [cdi, resteasy-reactive, smallrye-context-propagation, smallrye-health, vertx]
+2024-02-20 11:19:51,067 INFO  [myp.DbSource] (vert.x-worker-thread-1) Acquire...
+2024-02-20 11:19:51,068 INFO  [myp.DbSource] (vert.x-worker-thread-1) Acquire OK!1
+2024-02-20 11:19:51,077 WARN  [myp.DbSource] (vert.x-worker-thread-1) endOfRequest called
+2024-02-20 11:19:51,078 INFO  [myp.DbSource] (vert.x-worker-thread-1) Release
+2024-02-20 11:19:52,782 INFO  [myp.DbSource] (vert.x-worker-thread-1) Acquire...
+2024-02-20 11:19:52,783 INFO  [myp.DbSource] (vert.x-worker-thread-1) Acquire OK!1
+2024-02-20 11:19:53,621 INFO  [myp.DbSource] (vert.x-worker-thread-1) Acquire...
+2024-02-20 11:19:53,623 INFO  [myp.DbSource] (vert.x-worker-thread-1) Acquire OK!0
+2024-02-20 11:19:54,124 INFO  [myp.DbSource] (vert.x-worker-thread-1) Acquire...
+2024-02-20 11:19:57,127 INFO  [io.sma.health] (vert.x-worker-thread-1) SRHCK01001: Reporting health down status: {"status":"DOWN","checks":[{"name":"DbConnection","status":"DOWN","data":{"Exception":"Could not acquire on time"}}]}
 ```
 
-> **_NOTE:_**  Quarkus now ships with a Dev UI, which is available in dev mode only at http://localhost:8080/q/dev/.
+## For other endpoints it works well
 
-## Packaging and running the application
+Calling <http://localhost:8080/> or <http://localhost:8080/auto> works and releases the connection each time
 
-The application can be packaged using:
-```shell script
-./mvnw package
+```sh
+mvn quarkus:dev
+...
+__  ____  __  _____   ___  __ ____  ______ 
+ --/ __ \/ / / / _ | / _ \/ //_/ / / / __/ 
+ -/ /_/ / /_/ / __ |/ , _/ ,< / /_/ /\ \   
+--\___\_\____/_/ |_/_/|_/_/|_|\____/___/   
+2024-02-20 11:18:36,981 INFO  [io.quarkus] (Quarkus Main Thread) microprofile-health-quickstart 1.0.0-SNAPSHOT on JVM (powered by Quarkus 3.6.7) started in 1.559s. Listening on: http://0.0.0.0:8080
+
+2024-02-20 11:18:36,984 INFO  [io.quarkus] (Quarkus Main Thread) Profile dev activated. Live Coding activated.
+2024-02-20 11:18:36,985 INFO  [io.quarkus] (Quarkus Main Thread) Installed features: [cdi, resteasy-reactive, smallrye-context-propagation, smallrye-health, vertx]
+2024-02-20 11:18:49,695 INFO  [myp.Endpoint] (executor-thread-1) manual
+2024-02-20 11:18:49,698 INFO  [myp.DbSource] (executor-thread-1) Acquire...
+2024-02-20 11:18:49,699 INFO  [myp.DbSource] (executor-thread-1) Acquire OK!1
+2024-02-20 11:18:49,699 INFO  [myp.DbSource] (executor-thread-1) Release
+2024-02-20 11:18:49,703 WARN  [myp.DbSource] (executor-thread-1) endOfRequest called
+2024-02-20 11:18:52,604 INFO  [myp.Endpoint] (executor-thread-1) manual
+2024-02-20 11:18:52,605 INFO  [myp.DbSource] (executor-thread-1) Acquire...
+2024-02-20 11:18:52,605 INFO  [myp.DbSource] (executor-thread-1) Acquire OK!1
+2024-02-20 11:18:52,606 INFO  [myp.DbSource] (executor-thread-1) Release
+2024-02-20 11:18:52,606 WARN  [myp.DbSource] (executor-thread-1) endOfRequest called
+2024-02-20 11:18:53,090 INFO  [myp.Endpoint] (executor-thread-1) manual
+2024-02-20 11:18:53,091 INFO  [myp.DbSource] (executor-thread-1) Acquire...
+2024-02-20 11:18:53,091 INFO  [myp.DbSource] (executor-thread-1) Acquire OK!1
+2024-02-20 11:18:53,092 INFO  [myp.DbSource] (executor-thread-1) Release
+2024-02-20 11:18:53,092 WARN  [myp.DbSource] (executor-thread-1) endOfRequest called
+2024-02-20 11:18:53,471 INFO  [myp.Endpoint] (executor-thread-1) manual
+2024-02-20 11:18:53,472 INFO  [myp.DbSource] (executor-thread-1) Acquire...
+2024-02-20 11:18:53,472 INFO  [myp.DbSource] (executor-thread-1) Acquire OK!1
+2024-02-20 11:18:53,473 INFO  [myp.DbSource] (executor-thread-1) Release
+2024-02-20 11:18:53,473 WARN  [myp.DbSource] (executor-thread-1) endOfRequest called
+2024-02-20 11:18:56,115 INFO  [myp.Endpoint] (executor-thread-1) manual
+2024-02-20 11:18:56,116 INFO  [myp.DbSource] (executor-thread-1) Acquire...
+2024-02-20 11:18:56,116 INFO  [myp.DbSource] (executor-thread-1) Acquire OK!1
+2024-02-20 11:18:56,117 INFO  [myp.DbSource] (executor-thread-1) Release
+2024-02-20 11:18:56,117 WARN  [myp.DbSource] (executor-thread-1) endOfRequest called
+2024-02-20 11:19:03,914 INFO  [myp.Endpoint] (executor-thread-1) auto
+2024-02-20 11:19:03,915 INFO  [myp.DbSource] (executor-thread-1) Acquire...
+2024-02-20 11:19:03,915 INFO  [myp.DbSource] (executor-thread-1) Acquire OK!1
+2024-02-20 11:19:03,916 WARN  [myp.DbSource] (executor-thread-1) endOfRequest called
+2024-02-20 11:19:03,916 INFO  [myp.DbSource] (executor-thread-1) Release
+2024-02-20 11:19:04,668 INFO  [myp.Endpoint] (executor-thread-1) auto
+2024-02-20 11:19:04,669 INFO  [myp.DbSource] (executor-thread-1) Acquire...
+2024-02-20 11:19:04,670 INFO  [myp.DbSource] (executor-thread-1) Acquire OK!1
+2024-02-20 11:19:04,670 WARN  [myp.DbSource] (executor-thread-1) endOfRequest called
+2024-02-20 11:19:04,671 INFO  [myp.DbSource] (executor-thread-1) Release
+2024-02-20 11:19:04,965 INFO  [myp.Endpoint] (executor-thread-1) auto
+2024-02-20 11:19:04,965 INFO  [myp.DbSource] (executor-thread-1) Acquire...
+2024-02-20 11:19:04,966 INFO  [myp.DbSource] (executor-thread-1) Acquire OK!1
+2024-02-20 11:19:04,966 WARN  [myp.DbSource] (executor-thread-1) endOfRequest called
+2024-02-20 11:19:04,967 INFO  [myp.DbSource] (executor-thread-1) Release
+2024-02-20 11:19:05,232 INFO  [myp.Endpoint] (executor-thread-1) auto
+2024-02-20 11:19:05,232 INFO  [myp.DbSource] (executor-thread-1) Acquire...
+2024-02-20 11:19:05,233 INFO  [myp.DbSource] (executor-thread-1) Acquire OK!1
+2024-02-20 11:19:05,233 WARN  [myp.DbSource] (executor-thread-1) endOfRequest called
+2024-02-20 11:19:05,234 INFO  [myp.DbSource] (executor-thread-1) Release
 ```
-It produces the `quarkus-run.jar` file in the `target/quarkus-app/` directory.
-Be aware that it’s not an _über-jar_ as the dependencies are copied into the `target/quarkus-app/lib/` directory.
-
-The application is now runnable using `java -jar target/quarkus-app/quarkus-run.jar`.
-
-If you want to build an _über-jar_, execute the following command:
-```shell script
-./mvnw package -Dquarkus.package.type=uber-jar
-```
-
-The application, packaged as an _über-jar_, is now runnable using `java -jar target/*-runner.jar`.
-
-## Creating a native executable
-
-You can create a native executable using: 
-```shell script
-./mvnw package -Dnative
-```
-
-Or, if you don't have GraalVM installed, you can run the native executable build in a container using: 
-```shell script
-./mvnw package -Dnative -Dquarkus.native.container-build=true
-```
-
-You can then execute your native executable with: `./target/rest-kotlin-quickstart-1.0.0-SNAPSHOT-runner`
-
-If you want to learn more about building native executables, please consult https://quarkus.io/guides/maven-tooling.
-
-## Related Guides
-
-- Kotlin ([guide](https://quarkus.io/guides/kotlin)): Write your services in Kotlin
-
-## Provided Code
-
-### RESTEasy Reactive
-
-Easily start your Reactive RESTful Web Services
-
-[Related guide section...](https://quarkus.io/guides/getting-started-reactive#reactive-jax-rs-resources)
