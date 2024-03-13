@@ -2,17 +2,17 @@
 
 The sources contain 3 files
 
-- `Endpoint.java` which exposes:
+- `Endpoint.kt` which exposes:
   - expose <http://localhost:8080/> that accesses a "DbSource" then release it manully
   - expose <http://localhost:8080/auto> that accesses a "DbSource" then release it automatically thanks to the `@PreDestroy`
 
-- `DbSource.java` that emulates a pool of 4 tokens (like a DbPool)
+- `DbSource.kt` that emulates a pool of 4 tokens (like a DbPool)
   - `aquire` tries to acquire a token and immediately returns upon success
   - when the pool is exhausted `acquire` will block up to 3s then throw
   - `release` returns a token to the pool
-  - `DbSource.java` is marked as `@RequestScoped` and has a `@PreDestroy` method that does the `release` when the request is finished
+  - `DbSource.kt` is marked as `@RequestScoped` and has a `@PreDestroy` method that does the `release` when the request is finished
 
-- `ReadinessAndLiveness.java` that implements HealCheck that tries to aquires a token
+- `ReadinessAndLiveness.kt` that implements HealCheck that tries to aquires a token
 
 ## The issue
 
@@ -23,10 +23,10 @@ Example of logs when calling 5 times the HealthCheck:
 ```sh
 mvn quarkus:dev
 ...
-__  ____  __  _____   ___  __ ____  ______ 
- --/ __ \/ / / / _ | / _ \/ //_/ / / / __/ 
- -/ /_/ / /_/ / __ |/ , _/ ,< / /_/ /\ \   
---\___\_\____/_/ |_/_/|_/_/|_|\____/___/   
+__  ____  __  _____   ___  __ ____  ______
+ --/ __ \/ / / / _ | / _ \/ //_/ / / / __/
+ -/ /_/ / /_/ / __ |/ , _/ ,< / /_/ /\ \
+--\___\_\____/_/ |_/_/|_/_/|_|\____/___/
 2024-02-20 11:19:44,222 INFO  [io.quarkus] (Quarkus Main Thread) microprofile-health-quickstart 1.0.0-SNAPSHOT on JVM (powered by Quarkus 3.6.7) started in 1.572s. Listening on: http://0.0.0.0:8080
 
 2024-02-20 11:19:44,225 INFO  [io.quarkus] (Quarkus Main Thread) Profile dev activated. Live Coding activated.
@@ -50,10 +50,10 @@ Calling <http://localhost:8080/> or <http://localhost:8080/auto> works and relea
 ```sh
 mvn quarkus:dev
 ...
-__  ____  __  _____   ___  __ ____  ______ 
- --/ __ \/ / / / _ | / _ \/ //_/ / / / __/ 
- -/ /_/ / /_/ / __ |/ , _/ ,< / /_/ /\ \   
---\___\_\____/_/ |_/_/|_/_/|_|\____/___/   
+__  ____  __  _____   ___  __ ____  ______
+ --/ __ \/ / / / _ | / _ \/ //_/ / / / __/
+ -/ /_/ / /_/ / __ |/ , _/ ,< / /_/ /\ \
+--\___\_\____/_/ |_/_/|_/_/|_|\____/___/
 2024-02-20 11:18:36,981 INFO  [io.quarkus] (Quarkus Main Thread) microprofile-health-quickstart 1.0.0-SNAPSHOT on JVM (powered by Quarkus 3.6.7) started in 1.559s. Listening on: http://0.0.0.0:8080
 
 2024-02-20 11:18:36,984 INFO  [io.quarkus] (Quarkus Main Thread) Profile dev activated. Live Coding activated.
