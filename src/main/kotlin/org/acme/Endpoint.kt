@@ -8,7 +8,7 @@ import jakarta.ws.rs.Path;
 
 @Path("/")
 @RequestScoped
-class GreetingResource {
+class Endpoint {
 
     @Inject lateinit var  dbSource:DbSource
 
