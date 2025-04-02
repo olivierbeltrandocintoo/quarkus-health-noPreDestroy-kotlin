@@ -7,6 +7,15 @@
 
 This is like this since... at least quarkus 3.6 (I think that's where I started using probes). And it still like this after quarkus 3.7.
 
+## How to solve the issue
+
+add this line
+
+```
+# src/main/resources/application.properties
+quarkus.smallrye-health.context-propagation=true
+```
+
 ## Example of Health not releasing resources
 
 The sources contain 3 files
